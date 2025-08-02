@@ -1,14 +1,14 @@
 import io
 import base64
-import pickle
 import numpy as np
+import tensorflow as tf
 
 from flask import Flask, render_template, request, jsonify
 from PIL import Image
 
 
 app = Flask(__name__)
-classificador = pickle.load(open('ANN_MNIST-9261.sav', 'rb'))
+classificador = tf.keras.models.load_model('CNN_MNIST_aug.keras')
 
 @app.route('/')
 def index():
@@ -22,25 +22,16 @@ def preprocess_image(image_data):
     # Normaliza os pixels
     image_array = np.asarray(image)
     image_array = image_array / 255.0
-    return image_array.reshape(1, -1)
+    image_array = image_array.reshape(28, 28, 1)
+    return image_array # Retorna no shape=(28, 28, 1)
 
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
     image_data = data['image']
-    X = preprocess_image(image_data)
-    prediction_proba = classificador.predict_proba(X)
-    prediction_proba = prediction_proba * 100
-    return jsonify({'chance-0': prediction_proba[0][0],
-                    'chance-1': prediction_proba[0][1],
-                    'chance-2': prediction_proba[0][2],
-                    'chance-3': prediction_proba[0][3],
-                    'chance-4': prediction_proba[0][4],
-                    'chance-5': prediction_proba[0][5],
-                    'chance-6': prediction_proba[0][6],
-                    'chance-7': prediction_proba[0][7],
-                    'chance-8': prediction_proba[0][8],
-                    'chance-9': prediction_proba[0][9]})
+    X = np.expand_dims(preprocess_image(image_data), axis=0) # Transforma (28,28,1) em (1,28,28,1)
+    predict = classificador.predict(X)
+    return jsonify({ f'chance-{i}': float(p*100) for i, p in enumerate(predict[0]) })
 
 if __name__ == '__main__':
     app.run(debug=True)
